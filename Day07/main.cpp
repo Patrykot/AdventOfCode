@@ -41,9 +41,10 @@ bool getInputAsCollection(const char *filename, DataCollection &output) {
     while (std::getline(file, line)) {
         std::smatch matches;
         std::regex_search(line, matches, re);
+
         if (!matches.empty()) {
-            output.insert(std::make_pair(std::string(matches[1])[0], std::set<char>()));
-            output[std::string(matches[2])[0]].insert(std::string(matches[1])[0]);
+            output[matches.str(1)[0]];
+            output[matches.str(2)[0]].insert(matches.str(1)[0]);
             continue;
         }
     }
@@ -67,8 +68,8 @@ void firstPart(DataCollection requirementSets) {
 }
 
 struct worker {
-    char letterWorkingOn = 0;
-    unsigned jobDoneAt = 0;
+    char letterWorkingOn;
+    unsigned jobDoneAt;
 };
 
 void secondPart(DataCollection requirementSets) {
