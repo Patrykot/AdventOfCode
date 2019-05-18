@@ -1,29 +1,29 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <regex>
 #include <set>
 #include <string>
 
-const char * AOC_DIR = "/home/patryk/CLionProjects/AdventOfCode/";
-const char * DAY = "Day07";
+#include <boost/range/adaptors.hpp>
 
-typedef  std::map<char, std::set<char>> DataCollection;
+const char *AOC_DIR = "/home/patryk/CLionProjects/AdventOfCode/";
+const char *DAY = "Day07";
 
-const std::filesystem::path getInputFilePath(const char *filename)
-{
-	std::filesystem::path p = AOC_DIR;
-	return p / DAY / filename;
+typedef std::map<char, std::set<char>> DataCollection;
+
+const std::filesystem::path getInputFilePath(const char *filename) {
+    std::filesystem::path p = AOC_DIR;
+    return p / DAY / filename;
 }
 
-bool getInputAsCollection(const char* filename, DataCollection& output)
-{
+bool getInputAsCollection(const char *filename, DataCollection &output) {
     const std::filesystem::path input_file = getInputFilePath(filename);
 
     std::error_code ec;
-    if (!std::filesystem::is_regular_file(input_file, ec))
-    {
+    if (!std::filesystem::is_regular_file(input_file, ec)) {
         if (ec)
             std::cerr << "[" << ec.value() << "] " << ec.message() << std::endl;
         return false;
@@ -48,13 +48,12 @@ bool getInputAsCollection(const char* filename, DataCollection& output)
         }
     }
 
-	return true;
+    return true;
 }
 
-void firstPart(DataCollection requirementSets)
-{
+void firstPart(DataCollection requirementSets) {
     std::string result;
-    auto letterFinder = [](const auto& item) { return item.second.empty(); };
+    auto letterFinder = [](const auto &item) { return item.second.empty(); };
 
     while (!requirementSets.empty()) {
         auto firstLetterWithNoReqs = std::find_if(requirementSets.begin(), requirementSets.end(), letterFinder);
@@ -67,59 +66,72 @@ void firstPart(DataCollection requirementSets)
     std::cout << result << std::endl;
 }
 
-
-struct worker
-{
-
-    unsigned m_jobEndTime = 0;
+struct worker {
+    char letterWorkingOn = 0;
+    unsigned jobDoneAt = 0;
 };
 
-void secondPart(DataCollection requirementSets)
-{
+void secondPart(DataCollection requirementSets) {
+
     std::string result;
     unsigned timeCounter = 0;
-    std::vector<unsigned> workers(5,0);
+    std::vector<worker> workers(5);
 
-    auto letterFinder = [](const auto& item) { return item.second.empty(); };
-    auto workerAvailabilityChecker = [=] (const auto x) { return timeCounter == x; };
-
+    auto letterFinder = [](const auto &item) { return item.second.empty(); };
+    auto workerAvailabilityChecker = [&timeCounter] (const auto& w) { return timeCounter >= w.jobDoneAt; };
 
     while (!requirementSets.empty()) {
 
-        auto freeWorker = std::find_if(workers.begin(), workers.end(), workerAvailabilityChecker);
+        auto availableWorkers = workers | boost::adaptors::filtered(workerAvailabilityChecker);
 
-        while (freeWorker != workers.end())
-        {
-            auto firstLetterWithNoReqs = std::find_if(requirementSets.begin(), requirementSets.end(), letterFinder);
-            auto letter = firstLetterWithNoReqs->first;
-            result += letter;
-            requirementSets.erase(firstLetterWithNoReqs);
+        if (availableWorkers.empty()) {
+            timeCounter++;
+            continue;
+        }
 
-            std::for_each(requirementSets.begin(), requirementSets.end(),
-                          [&](auto &elem) { elem.second.erase(firstLetterWithNoReqs->first); });
+        for (auto &w : availableWorkers) {
+            if (w.letterWorkingOn) {
+                result += w.letterWorkingOn;
+                std::for_each(requirementSets.begin(), requirementSets.end(),
+                              [&](auto &elem) { elem.second.erase(w.letterWorkingOn); });
+                w.letterWorkingOn = 0;
+            }
+        }
 
-            *freeWorker += (60 + letter - 'B');
+        auto availableLetters = requirementSets | boost::adaptors::filtered(letterFinder);
+        auto availLettersIt = availableLetters.begin();
+
+        for (auto &w : availableWorkers) {
+            if (availLettersIt != availableLetters.end()) {
+                w.letterWorkingOn = availLettersIt->first;
+                w.jobDoneAt =  timeCounter + w.letterWorkingOn - ('A'-1) + 60;
+                ++availLettersIt;
+                requirementSets.erase(w.letterWorkingOn);
+            }
+            else {
+                break;
+            }
         }
 
         timeCounter++;
     }
 
-    std::cout << "Result: " << result << ". Seconds: " << timeCounter << std::endl;
+    auto lastWorker = std::max_element(workers.begin(), workers.end(), [] (const auto& a, const auto& b) { return a.jobDoneAt < b.jobDoneAt;});
 
+    std::cout << result << ". Seconds: " << lastWorker->jobDoneAt << std::endl;
 }
 
 
-int main()
-{
+int main() {
     DataCollection requirementSets;
 
-	if (!getInputAsCollection("day7test.txt", requirementSets))
-	    return -1;
+    if (!getInputAsCollection("day7.txt", requirementSets))
+        return -1;
 
-	std::cout << "First part: " << std::endl;
-	firstPart(requirementSets);
+    std::cout << "First part: " << std::endl;
+    firstPart(requirementSets);
 
-    std::cout << std::endl <<"Second part: " << std::endl;
+    std::cout << std::endl << "Second part: " << std::endl;
     secondPart(requirementSets);
 
     return 0;
